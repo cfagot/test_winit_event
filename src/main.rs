@@ -1,22 +1,33 @@
+use std::sync::Arc;
 use std::time::Instant;
 
+use render_context::{RenderContext, RenderSurface};
+use wgpu::PresentMode;
 use winit::application::ApplicationHandler;
 use winit::event::{KeyEvent, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
+mod render_context;
 
 struct TestApp {
     start_time: Instant,
-    window: Option<Window>,
+    last_render: Instant,
+    render_context: RenderContext,
+    window: Option<Arc::<Window>>,
+    surface: Option<RenderSurface<'static>>,
 }
 
 impl TestApp {
     fn new() -> Self {
+        let render_context = RenderContext::new();
         Self {
             start_time: Instant::now(),
+            last_render: Instant::now(),
+            render_context,
             window: None,
+            surface: None,
         }
     }
 }
@@ -32,8 +43,14 @@ impl ApplicationHandler for TestApp {
             .with_min_inner_size(min_window_size);
 
         let window = event_loop.create_window(window_attributes).unwrap();
+        let window = Arc::new(window);
         window.set_visible(true);
+
+        // let size = window.inner_size();
+        // let surface = pollster::block_on(self.render_context.create_surface(window.clone(), size.width, size.height, PresentMode::Fifo));
         self.window = Some(window);
+        // self.surface = Some(surface);
+        println!("Window created at {:?}", self.start_time.elapsed());
     }
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
@@ -58,6 +75,13 @@ impl ApplicationHandler for TestApp {
                 if let KeyEvent {physical_key: PhysicalKey::Code(KeyCode::Escape), ..} = event {
                     event_loop.exit();
                 }
+            }
+            WindowEvent::RedrawRequested => {
+                println!("WindowEvent::RedrawRequested at {:?}", self.start_time.elapsed());
+
+                // let surface_texture = self.surface.as_ref().unwrap().surface.get_current_texture().unwrap();
+                // surface_texture.present();
+                self.last_render = Instant::now();
             }
             _ => {}
         }
@@ -84,6 +108,11 @@ impl ApplicationHandler for TestApp {
     }
     
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        if self.last_render.elapsed().as_secs_f32() < 0.03 {
+            return;
+        }
+        println!("About to wait at {:?}", self.start_time.elapsed());
+        self.window.as_ref().unwrap().request_redraw();
     }
     
     
