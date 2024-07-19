@@ -28,6 +28,18 @@ impl RenderContext {
         }
     }
 
+    pub fn queue(&self) -> &Queue {
+        self.queue.as_ref().unwrap()
+    }
+
+    pub fn device(&self) -> &Device {
+        self.device.as_ref().unwrap()
+    }
+
+    pub fn adapter(&self) -> &Adapter {
+        self.adapter.as_ref().unwrap()
+    }
+
     /// Creates a new surface for the specified window and dimensions.
     pub async fn create_surface<'w>(
         &mut self,
@@ -41,14 +53,12 @@ impl RenderContext {
         let adapter = wgpu::util::initialize_adapter_from_env_or_default(&self.instance, Some(&surface)).await.unwrap();
         let features = adapter.features();
         let limits = Limits::default();
-        let mut maybe_features = wgpu::Features::CLEAR_TEXTURE;
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    required_features: features & maybe_features,
+                    required_features: features,
                     required_limits: limits,
-                    memory_hints: wgpu::MemoryHints::default(),
                 },
                 None,
             )
@@ -59,8 +69,7 @@ impl RenderContext {
         self.queue = Some(queue);
         self.adapter = Some(adapter);
 
-        let device = self.device.as_ref().unwrap();
-        let adapter = self.adapter.as_ref().unwrap();
+        let adapter = self.adapter();
 
         let capabilities = surface.get_capabilities(adapter);
         let format = *capabilities.formats.first().unwrap();
@@ -80,13 +89,7 @@ impl RenderContext {
             config,
             format,
         };
-        surface.surface.configure(self.device.as_ref().unwrap(), &surface.config);
+        surface.surface.configure(self.device(), &surface.config);
         return surface;
     }
-
-    pub fn set_present_mode(&self, surface: &mut RenderSurface, present_mode: wgpu::PresentMode) {
-        surface.config.present_mode = present_mode;
-        surface.surface.configure(self.device.as_ref().unwrap(), &surface.config);
-    }
-
 }
